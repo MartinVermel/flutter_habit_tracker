@@ -1,0 +1,41 @@
+name: flutter_habit_tracker
+description: A daily habit tracker app with charts, local persistence, and smooth animations.
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Local persistence
+  hive_flutter: ^1.1.0
+
+  # Charts & visualization
+  fl_chart: ^0.68.0
+
+  # Swipeable list items
+  flutter_slidable: ^3.1.0
+
+  # Entry animations
+  animate_do: ^3.3.4
+
+  # Date formatting
+  intl: ^0.19.0
+
+  # Unique IDs
+  uuid: ^4.4.0
+
+  # Color picker dialog
+  flutter_colorpicker: ^1.1.0
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
