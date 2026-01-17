@@ -1,71 +1,159 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/flutter/flutter-original.svg" alt="Flutter" width="80" />
+
 # Flutter Habit Tracker
 
-A daily habit tracking app built with Flutter, showcasing local persistence, custom animations, Material 3 design, and data visualisation.
+**Offline-first habit tracking — no backend required**
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white)](https://dart.dev)
+[![Storage](https://img.shields.io/badge/Storage-Hive-FF7043)](https://pub.dev/packages/hive)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Track daily habits, visualize streaks, and explore 30-day progress charts — all stored locally on device using Hive. No account, no server, no network.
+
+</div>
+
+---
+
+## Screenshots
+
+<div align="center">
+
+| Habit List | Add Habit | Weekly Progress | Habit Detail |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/habit_list.png" width="180" alt="Habit List" /> | <img src="docs/screenshots/add_habit.png" width="180" alt="Add Habit" /> | <img src="docs/screenshots/progress.png" width="180" alt="Progress Charts" /> | <img src="docs/screenshots/detail.png" width="180" alt="Habit Detail" /> |
+
+> **Note:** Screenshots coming soon — run the app locally to see it in action (`flutter run`, no API key needed).
+
+</div>
+
+---
 
 ## Features
 
-- **Habit management** — Create habits with a custom emoji, colour, and daily/weekly frequency
-- **Swipe actions** — `flutter_slidable` powers swipe-right to complete and swipe-left to delete
-- **Animated list** — `animate_do` staggers `FadeInLeft` entries so the list feels alive
-- **Progress charts** — `fl_chart` renders a grouped bar chart (weekly completions) and a 30-day cumulative line chart
-- **Calendar grid** — Custom widget showing which days a habit was completed this month
-- **Streak tracking** — Current streak and best streak calculated in `HabitService`
-- **Local persistence** — All data stored offline with `hive_flutter`; no backend needed
+- ✅ **Swipe actions** — swipe right to complete, swipe left to delete via `flutter_slidable`
+- 🎨 **Custom habit identity** — pick an emoji and a colour from a full HSV wheel
+- 📊 **Progress charts** — weekly grouped bar chart and 30-day cumulative line chart (`fl_chart`)
+- 🗓 **Calendar grid** — custom widget showing completed days at a glance
+- 🔥 **Streak tracking** — current streak and all-time best streak, calculated in O(streak) time
+- 💾 **100% offline** — Hive binary storage with hand-written `TypeAdapter`, no codegen needed
+- ✨ **Staggered animations** — `animate_do` `FadeInLeft` entries with index-based delay
+
+---
 
 ## Architecture
 
 ```
 lib/
-├── main.dart                  # App entry, Hive bootstrap
+├── main.dart                      # App entry — Hive.initFlutter() + adapter registration
 ├── models/
-│   ├── habit.dart             # Hive @HiveType annotated models
-│   └── habit.g.dart           # TypeAdapters (written by hand, no codegen)
+│   ├── habit.dart                 # @HiveType(typeId: 0) — Habit
+│   ├── habit_completion.dart      # @HiveType(typeId: 1) — HabitCompletion
+│   └── habit.g.dart               # Hand-written TypeAdapters (no build_runner)
 ├── services/
-│   └── habit_service.dart     # Singleton CRUD + streak logic
+│   └── habit_service.dart         # Singleton — CRUD, streak logic, weekly stats
 ├── screens/
-│   ├── habit_list_screen.dart # Home — ValueListenableBuilder + Slidable
-│   ├── add_habit_screen.dart  # Form with BlockPicker and emoji grid
-│   ├── habit_detail_screen.dart # Calendar grid + recent completions
-│   └── progress_screen.dart  # fl_chart BarChart + LineChart
+│   ├── habit_list_screen.dart     # ValueListenableBuilder + Slidable list
+│   ├── add_habit_screen.dart      # Form with EmojiGrid + BlockPicker
+│   ├── progress_screen.dart       # fl_chart BarChart + LineChart
+│   └── habit_detail_screen.dart   # Calendar grid + recent completions
 └── widgets/
-    └── habit_card.dart        # Animated completion toggle
+    ├── habit_card.dart            # Colour-coded card with streak badge
+    ├── calendar_grid.dart         # Custom month-view completion grid
+    └── stat_chip.dart             # Current streak / best streak pill
 ```
 
-## Libraries used
+**Data flow:**
+```
+HiveBox<Habit>  +  HiveBox<HabitCompletion>
+        ↓
+  HabitService  (CRUD, streak, weekly stats)
+        ↓
+  ValueListenableBuilder  →  UI rebuilds on box changes
+```
 
-| Package | Version | Purpose |
+---
+
+## Tech Stack
+
+| Package | Version | Role |
 |---|---|---|
-| `hive_flutter` | ^1.1.0 | Local NoSQL storage |
-| `fl_chart` | ^0.68.0 | Bar chart & line chart |
-| `flutter_slidable` | ^3.1.0 | Swipeable list items |
-| `animate_do` | ^3.3.4 | Entrance animations |
-| `intl` | ^0.19.0 | Date formatting |
-| `uuid` | ^4.4.0 | Stable habit IDs |
-| `flutter_colorpicker` | ^1.1.0 | Colour swatch picker |
+| `hive_flutter` | ^1.1.0 | Local binary NoSQL storage |
+| `fl_chart` | ^0.68.0 | Bar chart + line chart visualizations |
+| `flutter_slidable` | ^3.1.0 | Swipe-to-action on list tiles |
+| `animate_do` | ^3.3.4 | Staggered fade-in list animations |
+| `flutter_colorpicker` | ^1.1.0 | Full HSV color wheel widget |
+| `uuid` | ^4.4.0 | RFC 4122 IDs for Habit entities |
+| `intl` | ^0.19.0 | Date formatting for chart axis labels |
 
-## Getting started
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Flutter SDK `>=3.0.0`
+- No external API keys needed — fully offline
+
+### Installation
 
 ```bash
+git clone https://github.com/MartinVermel/flutter_habit_tracker.git
+cd flutter_habit_tracker
 flutter pub get
 flutter run
 ```
 
-Requires Flutter 3.x and Dart 3.x.
+That's it. No `.env` file, no account, no configuration.
 
-## Key implementation notes
+---
 
-### Hive TypeAdapters without codegen
-`habit.g.dart` is written by hand. This is intentional for portfolio purposes — it shows understanding of how Hive serialises objects at the byte level (`writeByte`, `readByte`, field-count header) rather than relying on the generator as a black box.
+## Key Implementation Notes
 
-### Streak calculation
-`HabitService.getCurrentStreak` walks backwards from today in O(streak_length) time using a `Set<DateTime>` lookup rather than sorting and scanning the full completion list. `getBestStreak` requires a sort pass, but it is called only on the detail screen.
+### Hive `typeId` immutability
+```dart
+@HiveType(typeId: 0)   // ← NEVER change once shipped
+class Habit extends HiveObject {
+  @HiveField(0) String id;
+  @HiveField(3) int colorValue;  // Color stored as ARGB int
+}
+```
+Hive uses `typeId` as a binary schema identifier. Changing it — or reordering `@HiveField` indices — silently corrupts all existing stored data. Field indices must be treated as immutable after the first production release. `Color` cannot be annotated directly; it's stored as `int colorValue` and reconstructed with `Color(colorValue)`.
 
-### Reactive UI with `ValueListenableBuilder`
-`HabitListScreen` wraps its content in a `ValueListenableBuilder` on the Hive box. Hive boxes implement `Listenable`, so any write (add/delete/toggle) automatically rebuilds the list without `setState` or a state management library.
+### Streak algorithm — O(streak) with O(1) lookup
+```dart
+int getCurrentStreak(String habitId) {
+  final dates = _completionBox.values
+    .where((c) => c.habitId == habitId)
+    .map((c) => c.date)
+    .toSet();                            // O(1) contains()
 
-### animate_do stagger pattern
-Each `HabitCard` is wrapped in `FadeInLeft` with `delay: Duration(milliseconds: index * 80)`. `animate_do` creates and disposes its own `AnimationController` internally, which keeps `HabitListScreen` free of controller boilerplate while still delivering per-item stagger.
+  var day = DateTime.utc(now.year, now.month, now.day); // normalized
+  int streak = 0;
+  while (dates.contains(day)) {
+    streak++;
+    day = day.subtract(const Duration(days: 1));
+  }
+  return streak;
+}
+```
+Two non-obvious details: (1) converting to a `Set` before the loop makes each day check O(1) instead of O(n); (2) `DateTime.utc(year, month, day)` normalizes to midnight UTC — without this, two completions on the "same calendar day" may not compare equal because `DateTime` equality checks microseconds.
 
-## Screenshots
+### fl_chart grouped bar chart — inverted mental model
+`BarChartGroupData` represents one **x-position** (a day), not one series (a habit). Each group holds multiple `BarChartRodData` items, one per habit. The outer loop iterates days; the inner loop iterates habits — the reverse of the intuitive "one dataset per series" framing.
 
-_Coming soon_
+---
+
+## Project Structure Decisions
+
+- **Why Hive over SQLite?** For small, schema-simple datasets like habits, Hive's binary storage is faster and requires zero SQL. The `TypeAdapter` pattern keeps serialization explicit and testable.
+- **Why hand-written `TypeAdapter` instead of `build_runner`?** Removes the codegen step entirely and makes the binary field mapping visible in code review — important for a project where field index stability is a correctness constraint.
+- **Why `ValueListenableBuilder` instead of a state management library?** Hive boxes expose a `Listenable` natively. For a single-screen CRUD app the extra indirection of a notifier adds complexity without benefit.
+
+---
+
+## License
+
+MIT © [Martin Vermel](https://github.com/MartinVermel)
