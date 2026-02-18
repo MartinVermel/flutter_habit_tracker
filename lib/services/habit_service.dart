@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/habit.dart';
+import 'firestore_sync_service.dart';
 
 /// Names for Hive boxes — centralised here to avoid typos across the codebase.
 const String kHabitBoxName = 'habits';
@@ -12,6 +14,7 @@ class HabitService {
   HabitService._internal();
 
   final _uuid = const Uuid();
+  final _sync = FirestoreSyncService();
 
   Box<Habit> get _habitBox => Hive.box<Habit>(kHabitBoxName);
   Box<HabitCompletion> get _completionBox =>
@@ -49,21 +52,48 @@ class HabitService {
       createdAt: DateTime.now(),
     );
     await _habitBox.put(habit.id, habit);
+    // Fire-and-forget sync — UI never waits on the network write
+    unawaited(_sync.upsertHabit(habit));
     return habit;
   }
 
   Future<void> updateHabit(Habit habit) async {
     await habit.save();
+    unawaited(_sync.upsertHabit(habit));
   }
 
   Future<void> deleteHabit(String habitId) async {
     await _habitBox.delete(habitId);
-    // Cascade-delete completions for this habit
+    // Cascade-delete completions for this habit locally
     final toDelete = _completionBox.values
         .where((c) => c.habitId == habitId)
         .map((c) => c.key)
         .toList();
     await _completionBox.deleteAll(toDelete);
+    // Delete habit + completions from Firestore in a single atomic batch
+    unawaited(_sync.deleteHabit(habitId));
+  }
+
+  /// Seeds Hive from a Firestore [SyncResult] after a user signs into an
+  /// existing account on a new device.
+  Future<void> applyRemoteSync(SyncResult result) async {
+    for (final habit in result.habits) {
+      await _habitBox.put(habit.id, habit);
+    }
+    for (final entry in result.completions) {
+      await _completionBox.put(entry.key, entry.value);
+    }
+  }
+
+  /// Collects all local data for upload to Firestore on account creation.
+  Future<void> uploadToFirestore() async {
+    final completionEntries = _completionBox.toMap().entries
+        .map((e) => MapEntry(e.key.toString(), e.value))
+        .toList();
+    await _sync.uploadAll(
+      habits: getAllHabits(),
+      completions: completionEntries,
+    );
   }
 
   // ── Completions ───────────────────────────────────────────────────────────
@@ -99,15 +129,18 @@ class HabitService {
     );
 
     if (existing.habitId.isNotEmpty) {
+      final key = existing.key.toString();
       await existing.delete();
+      unawaited(_sync.deleteCompletion(key));
     } else {
+      final key = '${habitId}_${today.millisecondsSinceEpoch}';
       final completion = HabitCompletion(
         habitId: habitId,
         date: today,
         completedAt: DateTime.now(),
       );
-      await _completionBox.put('${habitId}_${today.millisecondsSinceEpoch}',
-          completion);
+      await _completionBox.put(key, completion);
+      unawaited(_sync.upsertCompletion(completion, key));
     }
   }
 
