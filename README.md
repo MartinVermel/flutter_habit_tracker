@@ -9,9 +9,10 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![Storage](https://img.shields.io/badge/Storage-Hive-FF7043)](https://pub.dev/packages/hive)
+[![Firebase](https://img.shields.io/badge/Firebase-Auth%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Track daily habits, visualize streaks, and explore 30-day progress charts — all stored locally on device using Hive. No account, no server, no network.
+Track daily habits, visualize streaks, and explore 30-day progress charts — stored locally with Hive and optionally synced across devices via Firebase Auth + Firestore.
 
 </div>
 
@@ -33,6 +34,9 @@ Track daily habits, visualize streaks, and explore 30-day progress charts — al
 
 ## Features
 
+- ☁️ **Firebase Auth** — email/password sign-in, anonymous mode, anonymous → permanent account upgrade
+- 🔄 **Firestore sync** — write-through sync after every mutation; full download on new device sign-in
+- 📡 **Sync status badge** — live AppBar chip showing "Synced / Syncing… / Local only"
 - ✅ **Swipe actions** — swipe right to complete, swipe left to delete via `flutter_slidable`
 - 🎨 **Custom habit identity** — pick an emoji and a colour from a full HSV wheel
 - 📊 **Progress charts** — weekly grouped bar chart and 30-day cumulative line chart (`fl_chart`)
@@ -87,6 +91,9 @@ HiveBox<Habit>  +  HiveBox<HabitCompletion>
 | `flutter_colorpicker` | ^1.1.0 | Full HSV color wheel widget |
 | `uuid` | ^4.4.0 | RFC 4122 IDs for Habit entities |
 | `intl` | ^0.19.0 | Date formatting for chart axis labels |
+| `firebase_core` | ^3.6.0 | Firebase SDK initialization |
+| `firebase_auth` | ^5.3.1 | Email/password auth + anonymous sign-in |
+| `cloud_firestore` | ^5.4.4 | Real-time NoSQL sync across devices |
 
 ---
 
@@ -95,22 +102,104 @@ HiveBox<Habit>  +  HiveBox<HabitCompletion>
 ### Prerequisites
 
 - Flutter SDK `>=3.0.0`
-- No external API keys needed — fully offline
+- A Firebase project (free Spark plan is enough)
 
-### Installation
+### 1 — Clone and install
 
 ```bash
 git clone https://github.com/MartinVermel/flutter_habit_tracker.git
 cd flutter_habit_tracker
 flutter pub get
-flutter run
 ```
 
-That's it. No `.env` file, no account, no configuration.
+### 2 — Connect Firebase
+
+```bash
+# Install the FlutterFire CLI (once)
+dart pub global activate flutterfire_cli
+
+# Generate firebase_options.dart for your project + target platforms
+flutterfire configure
+```
+
+This overwrites `lib/firebase_options.dart` with real values for your project. Commit it — it contains no secrets.
+
+### 3 — Enable Auth and Firestore in the Firebase Console
+
+- **Authentication** → Sign-in method → enable **Email/Password** and **Anonymous**
+- **Firestore Database** → Create database → start in **test mode** (tighten rules before shipping)
+
+Recommended Firestore security rules:
+
+```js
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
+```
+
+### 4 — Run
+
+```bash
+flutter run
+```
 
 ---
 
 ## Key Implementation Notes
+
+### `StreamBuilder<User?>` as the root navigator
+```dart
+home: StreamBuilder<User?>(
+  stream: AuthService().userStream,  // FirebaseAuth.authStateChanges()
+  builder: (context, snapshot) {
+    if (snapshot.data == null) return const AuthScreen();
+    return const HabitListScreen();
+  },
+),
+```
+`authStateChanges()` emits whenever the auth state changes — sign-in, sign-out, token refresh. By making it the `home` of `MaterialApp`, the app reacts to auth state automatically with no manual `Navigator.pushReplacement`. When the user signs out, the widget tree swaps to `AuthScreen` without any explicit navigation code in the sign-out handler.
+
+### Anonymous → permanent account upgrade
+```dart
+Future<UserCredential> linkWithEmail(String email, String password) {
+  final credential =
+      EmailAuthProvider.credential(email: email, password: password);
+  return FirebaseAuth.instance.currentUser!.linkWithCredential(credential);
+}
+```
+`linkWithCredential` converts an anonymous account into a permanent one while preserving the uid — which means all Firestore documents at `users/{uid}/...` are automatically inherited. No data migration needed. The user keeps their habits whether or not they had an account when they started.
+
+### Write-through sync — `unawaited` for UI speed
+```dart
+Future<void> createHabit({...}) async {
+  await _habitBox.put(habit.id, habit);  // local write completes first
+  unawaited(_sync.upsertHabit(habit));   // Firestore write is fire-and-forget
+  return habit;
+}
+```
+Hive is the source of truth; Firestore is the backup. The UI never waits on the network. `unawaited()` (from `dart:async`) explicitly marks the Future as intentionally not awaited — this suppresses the linter warning and signals to reviewers that the fire-and-forget is deliberate, not an oversight.
+
+### Atomic batch delete — habit + all its completions
+```dart
+Future<void> deleteHabit(String habitId) async {
+  final batch = _db.batch();
+  batch.delete(_habitsRef.doc(habitId));
+  final completions = await _completionsRef
+      .where('habitId', isEqualTo: habitId).get();
+  for (final doc in completions.docs) {
+    batch.delete(doc.reference);
+  }
+  await batch.commit(); // atomic — either all delete or nothing does
+}
+```
+A Firestore `WriteBatch` applies all deletes in a single atomic operation. If the network drops mid-delete, Firestore either applies all of them or none — the habit and its completions are never left in an inconsistent state. Batches are also more efficient than individual deletes: one round trip instead of N.
+
+---
 
 ### Hive `typeId` immutability
 ```dart
