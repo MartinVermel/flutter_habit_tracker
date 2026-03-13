@@ -35,16 +35,24 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() { _loading = true; _error = null; });
 
     try {
+      final email = _emailCtrl.text.trim();
       if (_isSignUp) {
-        await _auth.createAccount(_emailCtrl.text.trim(), _passwordCtrl.text);
+        // Anonymous users are upgraded in place so their uid is preserved.
+        if (_auth.currentUser?.isAnonymous ?? false) {
+          await _auth.linkWithEmail(email, _passwordCtrl.text);
+        } else {
+          await _auth.createAccount(email, _passwordCtrl.text);
+        }
         // Push all local data to Firestore for the new account
         await HabitService().uploadToFirestore();
       } else {
-        await _auth.signInWithEmail(_emailCtrl.text.trim(), _passwordCtrl.text);
+        await _auth.signInWithEmail(email, _passwordCtrl.text);
         // Pull remote data into Hive on sign-in to an existing account
         final result = await FirestoreSyncService().downloadAll();
         await HabitService().applyRemoteSync(result);
       }
+      // When opened from the sync badge, AuthScreen sits on top of the list.
+      if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
       setState(() { _error = _friendlyError(e.code); });
     } finally {
@@ -67,6 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
     switch (code) {
       case 'user-not-found': return 'No account found with this email.';
       case 'wrong-password': return 'Incorrect password.';
+      case 'credential-already-in-use':
       case 'email-already-in-use': return 'An account with this email already exists.';
       case 'weak-password': return 'Password must be at least 6 characters.';
       case 'invalid-email': return 'Please enter a valid email address.';
