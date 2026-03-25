@@ -150,6 +150,35 @@ flutter run
 
 ---
 
+## Docker
+
+The app ships as a Flutter **web** build served by nginx, using a multi-stage `Dockerfile` (Flutter SDK build stage, then a ~100 MB nginx:alpine runtime image).
+
+```bash
+docker compose up --build
+```
+Open http://localhost:8080.
+
+Or without Compose:
+
+```bash
+docker build -t flutter_habit_tracker .
+docker run -p 8080:80 flutter_habit_tracker
+```
+
+No secrets are needed at build time. Firebase values come from `lib/firebase_options.dart`.
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Stage 1 builds `flutter build web --release`, stage 2 copies the output into nginx |
+| `nginx.conf` | SPA fallback to `index.html`, gzip, long-lived cache for assets, no-cache for the bootstrap files |
+| `docker-compose.yml` | One-command run on port 8080 |
+| `.dockerignore` | Keeps `.git`, `build/` and `.dart_tool/` out of the build context |
+
+Docker serves the web target only. For Android/iOS builds use `flutter run` as above.
+
+---
+
 ## Key Implementation Notes
 
 ### `StreamBuilder<User?>` as the root navigator
