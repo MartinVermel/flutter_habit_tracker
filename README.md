@@ -157,13 +157,13 @@ The app ships as a Flutter **web** build served by nginx, using a multi-stage `D
 ```bash
 docker compose up --build
 ```
-Open http://localhost:8080.
+Open http://localhost:8103 (each project uses its own port so they can run side by side; override with `HOST_PORT=9000 docker compose up --build`).
 
 Or without Compose:
 
 ```bash
 docker build -t flutter_habit_tracker .
-docker run -p 8080:80 flutter_habit_tracker
+docker run -p 8103:80 flutter_habit_tracker
 ```
 
 No secrets are needed at build time. Firebase values come from `lib/firebase_options.dart`.
@@ -172,7 +172,7 @@ No secrets are needed at build time. Firebase values come from `lib/firebase_opt
 |---|---|
 | `Dockerfile` | Stage 1 builds `flutter build web --release`, stage 2 copies the output into nginx |
 | `nginx.conf` | SPA fallback to `index.html`, gzip, long-lived cache for assets, no-cache for the bootstrap files |
-| `docker-compose.yml` | One-command run on port 8080 |
+| `docker-compose.yml` | One-command run on port 8103 |
 | `.dockerignore` | Keeps `.git`, `build/` and `.dart_tool/` out of the build context |
 
 Docker serves the web target only. For Android/iOS builds use `flutter run` as above.
