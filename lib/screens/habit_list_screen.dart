@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/habit.dart';
 import '../services/habit_service.dart';
 import '../widgets/habit_card.dart';
+import '../widgets/sync_status_badge.dart';
 import 'add_habit_screen.dart';
 import 'habit_detail_screen.dart';
 import 'progress_screen.dart';
@@ -128,6 +129,7 @@ class _HabitListScreenState extends State<HabitListScreen> {
               ],
             ),
             actions: [
+              const Center(child: SyncStatusBadge()),
               IconButton(
                 icon: const Icon(Icons.bar_chart_rounded),
                 tooltip: 'Progress',
